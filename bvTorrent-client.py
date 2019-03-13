@@ -9,8 +9,13 @@ import time
 from socket import *
 
 
-DEFAULT_PORT = 42424
-
+DEFAULT_TRACKER_PORT = 42424
+DEFAULT_CLIENT_PORT = 3000
+FILE_NAME = ""
+MAX_CHUNK_SIZE = ""
+NUM_FILE_CHUNKS = ""
+CHUNK_MSG = ""
+BYTE_MASK = ""
 
 #Reads in all the bytes that we were expecting to recieve
 #from the server.
@@ -43,7 +48,18 @@ def sendControlMsg(msg, conn):
 
 #Handles the New Connection Protocol specified by the tracker.
 def handleNewConnection(conn):
-  #TODO
+  FILE_NAME = getByteLine(conn)
+  MAX_CHUNK_SIZE = getByteLine(conn)
+  NUM_FILE_CHUNKS = getByteLine(conn)
+  CHUNK_MSG = getAllBytes(conn)
+
+  for x in range(0, NUM_FILE_CHUNKS+1):
+    BYTE_MASK += 0
+  
+  BYTE_MASK += '\n'
+  
+  conn.send((DEFAULT_CLIENT_PORT + "," + BYTE_MASK).encode())
+
 
 #Handles the protocol for updating the clients Bit Mask.
 #Will send the tracker 1's and 0's equal to the number of chunks for the file,
