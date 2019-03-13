@@ -11,11 +11,16 @@ from socket import *
 
 DEFAULT_TRACKER_PORT = 42424
 DEFAULT_CLIENT_PORT = 3000
+
+#Probably super gross and dirty, don't know where we need to use
+#all of these variables yet though so I just made them global.
 FILE_NAME = ""
 MAX_CHUNK_SIZE = ""
 NUM_FILE_CHUNKS = ""
-CHUNK_MSG = ""
+CHUNK_MSG = []
 BYTE_MASK = ""
+NUM_CLIENT_LIST = ""
+CLIENT_LIST = []
 
 #Reads in all the bytes that we were expecting to recieve
 #from the server.
@@ -51,7 +56,9 @@ def handleNewConnection(conn):
   FILE_NAME = getByteLine(conn)
   MAX_CHUNK_SIZE = getByteLine(conn)
   NUM_FILE_CHUNKS = getByteLine(conn)
-  CHUNK_MSG = getAllBytes(conn)
+
+  while(len(CHUNK_MSG) < NUM_FILE_CHUNKS):
+    CHUNK_MSG += getByteLine(conn)
 
   for x in range(0, NUM_FILE_CHUNKS+1):
     BYTE_MASK += 0
@@ -71,7 +78,12 @@ def handleUpdateMask(conn):
 #Handles the protocol for updating current connected clients.
 #Will recieve number of clients from the tracker and descriptors of each client.
 def handleClientListRequest(conn):
-  #TODO
+  sendControlMsg("CLIENT_LIST")
+  NUM_CLIENT_LIST = getByteLine(conn)
+  
+  while(len(CLIENT_LIST) < NUM_CLIENT_LIST):
+    CLIENT_LIST += getByteLine(conn)
+
 
 
 def main():
@@ -85,9 +97,12 @@ def main():
 
   handleNewConnection(conn)
   
+  #Download file here. While loop?
+
   print("Finished Downloading!")
   print("Closing Connection...")
 
+  sendControlMsg("DISCONNECT")
   #Close the connection to the tracker.
   conn.close()
 
