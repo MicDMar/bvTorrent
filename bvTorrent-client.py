@@ -44,7 +44,7 @@ def getByteLine(conn):
 
 #Sends a 12-byte control message to the tracker detailing the clients intentions.
 def sendControlMsg(msg, conn):
-  #TODO
+  conn.send(msg.encode())
 
 #Handles the New Connection Protocol specified by the tracker.
 def handleNewConnection(conn):
@@ -65,7 +65,8 @@ def handleNewConnection(conn):
 #Will send the tracker 1's and 0's equal to the number of chunks for the file,
 #terminated by a '\n'.
 def handleUpdateMask(conn):
-  #TODO
+  sendControlMsg("UPDATE_MASK")
+  conn.send(BYTE_MASK)
 
 #Handles the protocol for updating current connected clients.
 #Will recieve number of clients from the tracker and descriptors of each client.
