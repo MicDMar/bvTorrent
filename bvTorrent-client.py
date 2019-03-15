@@ -7,6 +7,7 @@ from socket import *
 DEFAULT_TRACKER_ADDRESS = "localhost"
 DEFAULT_TRACKER_PORT = 42424
 DEFAULT_CLIENT_PORT = 3000
+CLIENT_LIST_UPDATE_INTERVAL = 60
 
 FILE_NAME = ""
 MAX_CHUNK_SIZE = ""
@@ -17,6 +18,7 @@ file_data = None
 digests = []
 chunk_sizes = []
 clients = {} # { (ip,port) : bytemask, ... }
+client_list_lock = threading.Lock()
 
 port = os.environ.get("PORT", DEFAULT_CLIENT_PORT)
 tracker_address = os.environ.get("TADDRESS", DEFAULT_TRACKER_ADDRESS)
@@ -68,9 +70,9 @@ def handleNewConnection(conn):
         digests.append(digest)
         chunk_sizes.append(sz)
         BYTE_MASK += '0'
+        file_data.append(b'0')
         
-    file_data = bytes(total_size)
-
+    # file_data = bytes(total_size)
 
     BYTE_MASK += '\n'
 
@@ -86,6 +88,7 @@ def handleUpdateMask(conn):
 #Handles the protocol for updating current connected clients.
 #Will recieve number of clients from the tracker and descriptors of each client.
 def handleClientListRequest(conn):
+    client_list_lock.acquire()
     global clients
     clients = {}
     sendControlMsg("CLIENT_LIST", conn)
@@ -97,15 +100,27 @@ def handleClientListRequest(conn):
         key = (temp[0], int(temp[1])) 
         
         clients[key] = mask
+    client_list_lock.release()
+
+def chunk_indexes(chunk_num):
+    start = 0
+    for i in range(chunk_num-1):
+       start += chunk_sizes[i]
+    end = start + chunk_sizes[chunk_num] 
+
+    return (start, end)
 
 def serve_chunk(conn):
     # Figure out which chunk they want and see if we have it
-    chunk_index = int(getByteLine(conn))
+    chunk_num = int(getByteLine(conn))
     
     # Determine the byte boundaries for the chunk they want
+    startI, endI = chunk_indexes(chunk_num)
+    data = file_data[startI:endI]
 
     # Send it
-
+    conn.send(data)
+    
 def decide_chunk():
     chunk_search = {} # { chunk_num: (chunk_total_count, potential_hosts), ... }
     for client, client_mask in clients.items():
@@ -162,8 +177,23 @@ def get_chunk(chunk_num, address):
     conn.connect(address)
 
     # Connect to the client and retrieve the chunk
+    # First send the chunk number
+    conn.send("{}\n".format(chunk_num).encode())
+    # Receive the bytes for the chunk
+    chunk_data = getAllBytes(chunk_sizes[chunk_num], conn)
 
-    # Verify the digest
+    # Store the bytes in the file data  
+    j = 0
+    for i in range(*chunk_indexes(chunk_num)):
+        file_data[i] = chunk_data[j]
+        j += 1
+    
+    # TODO: Verify the digest
+        
+def update_clients(conn):
+    while True:
+        handleClientListRequest(conn)
+        time.sleep(CLIENT_LIST_UPDATE_INTERVAL)
         
 def main():
     print("Establishing a connection for download {}.".format((tracker_address, tracker_port)))
@@ -174,18 +204,17 @@ def main():
     conn.connect((tracker_address, tracker_port))
 
     handleNewConnection(conn)
-    handleClientListRequest(conn)
 
     # Launch a thread to accept connections for others to download
     threading.Thread(target=serve_clients, daemon=True).start()
 
+    # Launch a thread to update the client list periodically
+    handleClientListRequest(conn) 
+    threading.Thread(target=update_clients, args=(conn,)).start()
+
     # Get a chunk while our byte mask is not full
     while all(map(lambda x: x == '1', BYTE_MASK)) == False:
         selected_chunk, selected_host = decide_chunk()
-
-        # Determine if we should retrieve the client list
-        # if shouldRetrieve:
-        #    handleClientListRequest(conn)
         
         # Retrieve the chunk
         get_chunk(selected_chunk, selected_host)
@@ -202,7 +231,6 @@ def main():
 
     #Close the connection to the tracker.
     conn.close()
-
 
 if __name__ == "__main__":
     main()
