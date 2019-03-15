@@ -72,13 +72,13 @@ def handleNewConnection(conn):
 #Will send the tracker 1's and 0's equal to the number of chunks for the file,
 #terminated by a '\n'.
 def handleUpdateMask(conn):
-  sendControlMsg("UPDATE_MASK")
+  sendControlMsg("UPDATE_MASK\n")
   conn.send(BYTE_MASK)
 
 #Handles the protocol for updating current connected clients.
 #Will recieve number of clients from the tracker and descriptors of each client.
 def handleClientListRequest(conn):
-  sendControlMsg("CLIENT_LIST")
+  sendControlMsg("CLIENT_LIST\n")
   NUM_CLIENT_LIST = getByteLine(conn)
   
   while(len(CLIENT_LIST) < NUM_CLIENT_LIST):
@@ -102,7 +102,7 @@ def main():
   print("Finished Downloading!")
   print("Closing Connection...")
 
-  sendControlMsg("DISCONNECT")
+  sendControlMsg("DISCONNECT\n")
   #Close the connection to the tracker.
   conn.close()
 
