@@ -181,14 +181,15 @@ def get_chunk(chunk_num, address):
     conn.send("{}\n".format(chunk_num).encode())
     # Receive the bytes for the chunk
     chunk_data = getAllBytes(chunk_sizes[chunk_num], conn)
+    
+    if(digests[chunk_num] != chunk_data):
+        break;
 
     # Store the bytes in the file data  
     j = 0
     for i in range(*chunk_indexes(chunk_num)):
         file_data[i] = chunk_data[j]
         j += 1
-    
-    # TODO: Verify the digest
         
 def update_clients(conn):
     while True:
